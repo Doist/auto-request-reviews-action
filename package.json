@@ -1,0 +1,29 @@
+{
+  "name": "auto-request-reviews-action",
+  "version": "1.0.0",
+  "description": "GitHub Action that automatically requests reviews from members of a specified team",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js --sourcemap",
+    "lint": "biome lint ./src",
+    "format": "biome format --write ./src"
+  },
+  "keywords": [
+    "github",
+    "actions",
+    "reviews",
+    "pull-requests"
+  ],
+  "author": "Doist",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "@biomejs/biome": "1.9.4",
+    "esbuild": "^0.25.2",
+    "typescript": "^5.8.3"
+  }
+}
