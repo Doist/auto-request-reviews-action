@@ -11,6 +11,16 @@ inputs:
   token:
     description: "GitHub token with permissions to request reviews"
     required: true
+  debug:
+    description: "Enable debug mode (for local testing only)"
+    required: false
+    default: "false"
+  repo:
+    description: "Repository name in format 'owner/repo' (only used in debug mode)"
+    required: false
+  pr_number:
+    description: "Pull request number (only used in debug mode)"
+    required: false
 
 runs:
   using: "node20"

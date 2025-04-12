@@ -12,6 +12,7 @@ async function run(): Promise<void> {
     );
     const teamSlug = core.getInput("team", { required: true }); // format: org/team
     const token = core.getInput("token", { required: true });
+    const debugMode = core.getInput("debug") === "true";
 
     // Split team input into org and team
     const [owner, team] = teamSlug.split("/");
@@ -25,13 +26,46 @@ async function run(): Promise<void> {
     const octokit = github.getOctokit(token);
     const context = github.context;
 
-    // Ensure we're in a pull request context
-    if (!context.payload.pull_request) {
-      throw new Error("This action can only be run on pull request events");
-    }
+    let repo: { owner: string; repo: string };
+    let pullNumber: number;
 
-    const pullNumber = context.payload.pull_request.number;
-    const repo = context.repo;
+    if (debugMode) {
+      // Use provided repo and PR number in debug mode
+      core.info("Running in debug mode with manually provided repository and PR information");
+      
+      const repoInput = core.getInput("repo");
+      if (!repoInput) {
+        throw new Error("In debug mode, 'repo' input is required (format: 'owner/repo')");
+      }
+      
+      const [repoOwner, repoName] = repoInput.split("/");
+      if (!repoOwner || !repoName) {
+        throw new Error(`Invalid repo format. Expected 'owner/repo', got '${repoInput}'`);
+      }
+      
+      repo = { owner: repoOwner, repo: repoName };
+      
+      const prNumberInput = core.getInput("pr_number");
+      if (!prNumberInput) {
+        throw new Error("In debug mode, 'pr_number' input is required");
+      }
+      
+      pullNumber = Number.parseInt(prNumberInput);
+      if (isNaN(pullNumber)) {
+        throw new Error(`Invalid PR number: ${prNumberInput}`);
+      }
+
+      core.info(`Debug mode: Using repository ${repo.owner}/${repo.repo} and PR #${pullNumber}`);
+    } else {
+      // Normal mode: Use GitHub context
+      // Ensure we're in a pull request context
+      if (!context.payload.pull_request) {
+        throw new Error("This action can only be run on pull request events");
+      }
+
+      pullNumber = context.payload.pull_request.number;
+      repo = context.repo;
+    }
 
     // Get current PR reviewers
     const { data: pullRequest } = await octokit.rest.pulls.get({
@@ -106,16 +140,81 @@ async function run(): Promise<void> {
 
     // Request reviews
     if (reviewersToRequest.length > 0) {
-      await octokit.rest.pulls.requestReviewers({
-        owner: repo.owner,
-        repo: repo.repo,
-        pull_number: pullNumber,
-        reviewers: reviewersToRequest,
-      });
+      console.log(`Found ${teamMembers.length} team members in ${owner}/${team}`);
+      console.log(`Eligible reviewers: ${eligibleReviewers.length}`);
+      console.log(`Attempting to request reviews from: ${reviewersToRequest.join(", ")}`);
+      console.log(`API call parameters: PR #${pullNumber} in ${repo.owner}/${repo.repo}`);
+      
+      try {
+        // Print raw GitHub context for debugging
+        console.log('GitHub context:', JSON.stringify(github.context, null, 2));
+        console.log('Using repo structure:', JSON.stringify(repo, null, 2));
+        
+        // This could be a pull request permissions issue or API endpoint issue
+        // Let's try a completely different approach: add the team as a reviewer directly
+        
+        console.log(`Trying to request team as reviewer instead of individual users`);
+        
+        try {
+          // Try adding the entire team as a reviewer
+          await octokit.request('POST /repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers', {
+            owner: repo.owner,
+            repo: repo.repo,
+            pull_number: pullNumber,
+            team_reviewers: [team], // Use team_reviewers parameter instead
+          });
+          console.log(`Successfully requested team reviewer: ${team}`);
+        } catch (teamError) {
+          console.log(`Team reviewer request failed: ${teamError instanceof Error ? teamError.message : 'Unknown error'}`);
+          console.log('Falling back to individual user request...');
+          
+          // Try with standard individual requests again but with base URL verification
+          const baseUrl = octokit.request.endpoint.DEFAULTS.baseUrl; // Get the actual base URL being used
+          console.log(`Octokit base URL: ${baseUrl}`);
+          
+          await octokit.request('POST /repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers', {
+            owner: repo.owner,
+            repo: repo.repo,
+            pull_number: pullNumber,
+            reviewers: reviewersToRequest.slice(0, 1), // Try with just one reviewer
+          });
+        }
 
-      core.info(
-        `Successfully requested reviews from: ${reviewersToRequest.join(", ")}`,
-      );
+        core.info(
+          `Successfully requested reviews from: ${reviewersToRequest.join(", ")}`,
+        );
+      } catch (error) {
+        if (error instanceof Error) {
+          core.error(`Failed to request reviews: ${error.message}`);
+          
+          // Validate PR exists
+          try {
+            core.info("Checking if PR exists...");
+            const { data: pr } = await octokit.rest.pulls.get({
+              owner: repo.owner,
+              repo: repo.repo,
+              pull_number: pullNumber,
+            });
+            core.info(`PR #${pullNumber} exists with title: ${pr.title}`);
+          } catch (prError) {
+            if (prError instanceof Error) {
+              core.error(`PR validation failed: ${prError.message}`);
+            }
+          }
+          
+          // Check token permissions
+          try {
+            core.info("Checking authenticated user...");
+            const { data: user } = await octokit.rest.users.getAuthenticated();
+            core.info(`Authenticated as ${user.login}`);
+          } catch (authError) {
+            if (authError instanceof Error) {
+              core.error(`Auth validation failed: ${authError.message}`);
+            }
+          }
+        }
+        throw error;
+      }
     }
   } catch (error) {
     if (error instanceof Error) {

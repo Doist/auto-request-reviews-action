@@ -3,18 +3,27 @@ name: Test action
 on:
   pull_request:
     types: [opened, ready_for_review, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull request number for testing'
+        required: true
+        type: string
 
 jobs:
   request-reviews:
     runs-on: ubuntu-latest
-    if: ${{ !github.event.pull_request.draft }}
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.pull_request.draft }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Automatically request reviews
+      - name: Automatically request reviews (Debug mode)
         uses: ./
         with:
           reviewers: 2
           team: Doist/bots
           token: ${{ secrets.GH_PROJECTS_TOKEN }}
+          debug: 'true'
+          repo: ${{ github.repository }}
+          pr_number: 3

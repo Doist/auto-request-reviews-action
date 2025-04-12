@@ -31,6 +31,9 @@ jobs:
 | `reviewers` | Desired total number of reviewers in total | Yes | |
 | `team` | Team to pick reviewers from (format: org/team) | Yes | |
 | `token` | GitHub token with required permissions (see [Permissions](#permissions)) | Yes | |
+| `debug` | Enable debug mode for local testing | No | `false` |
+| `repo` | Repository name in format 'owner/repo' (only used in debug mode) | No | |
+| `pr_number` | Pull request number (only used in debug mode) | No | |
 
 ## How it works
 
@@ -51,6 +54,27 @@ team member access. You can use a Personal Access Token with the following scope
 - `read:org` (required to access team membership)
 
 Store the PAT as a repository secret and pass it in your workflow.
+
+## Debug Mode
+
+If you're testing this action locally or having issues with the default GitHub context, you can use debug mode:
+
+```yml
+- name: Automatically request reviews (Debug mode)
+  uses: doist/auto-request-reviews-action@v1
+  with:
+    reviewers: 2
+    team: Doist/team
+    token: ${{ secrets.GITHUB_TOKEN }}
+    debug: 'true'
+    repo: octocat/example-repo
+    pr_number: 123
+```
+
+In debug mode:
+1. The action ignores the GitHub context for PR information
+2. You manually specify the repository and PR number
+3. This is useful for testing or when the action can't detect the PR context
 
 ## Development
 
