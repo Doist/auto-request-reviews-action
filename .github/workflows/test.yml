@@ -1,0 +1,20 @@
+name: Test action
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+
+jobs:
+  request-reviews:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Automatically request reviews
+        uses: ./
+        with:
+          reviewers: 2
+          team: Doist/bots
+          token: ${{ secrets.GH_PROJECTS_TOKEN }}

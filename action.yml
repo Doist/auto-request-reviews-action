@@ -1,0 +1,17 @@
+name: "Auto Request Reviews"
+description: "Automatically requests reviews from members of a specified team"
+
+inputs:
+  reviewers:
+    description: "Desired total number of reviewers in total"
+    required: true
+  team:
+    description: "Team to pick reviewers from (format: org/team)"
+    required: true
+  token:
+    description: "GitHub token with permissions to request reviews"
+    required: true
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
