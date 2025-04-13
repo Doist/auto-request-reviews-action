@@ -109,16 +109,58 @@ async function run(): Promise<void> {
 
     // Request reviews
     if (reviewersToRequest.length > 0) {
-      await octokit.rest.pulls.requestReviewers({
-        owner: repo.owner,
-        repo: repo.repo,
-        pull_number: pullNumber,
-        reviewers: reviewersToRequest,
-      });
-
-      core.info(
-        `Successfully requested reviews from: ${reviewersToRequest.join(", ")}`,
-      );
+      core.info(`PR details: ${pullRequest.html_url}`);
+      core.info(`Authenticated as ${authenticatedUser.login}`);
+      core.info(`Requesting reviews from: ${reviewersToRequest.join(", ")}`);
+      
+      try {
+        // Try using the direct REST API endpoint
+        const requestUrl = `/repos/${repo.owner}/${repo.repo}/pulls/${pullNumber}/requested_reviewers`;
+        core.info(`Using API endpoint: ${requestUrl}`);
+        
+        // Use direct REST API call instead of the helper method
+        const response = await octokit.request(`POST ${requestUrl}`, {
+          reviewers: reviewersToRequest,
+          headers: {
+            accept: 'application/vnd.github.v3+json'
+          }
+        });
+        
+        core.info(`API response status: ${response.status}`);
+        core.info(`Successfully requested reviews from: ${reviewersToRequest.join(", ")}`);
+      } catch (error) {
+        // Extract more information from the error
+        if (error instanceof Error) {
+          core.error(`Error requesting reviews: ${error.message}`);
+          if ('status' in error) {
+            core.error(`Status code: ${(error as any).status}`);
+          }
+          
+          // Check PR status
+          core.info(`PR state: ${pullRequest.state}, Draft: ${pullRequest.draft === true ? 'Yes' : 'No'}`);
+          
+          // Try with a smaller batch - just one reviewer
+          if (reviewersToRequest.length > 1) {
+            core.info('Trying with a single reviewer instead of multiple...');
+            try {
+              const singleReviewer = reviewersToRequest[0];
+              await octokit.request(`POST /repos/${repo.owner}/${repo.repo}/pulls/${pullNumber}/requested_reviewers`, {
+                reviewers: [singleReviewer],
+              });
+              core.info(`Successfully requested review from: ${singleReviewer}`);
+            } catch (singleError) {
+              if (singleError instanceof Error) {
+                core.error(`Single reviewer request also failed: ${singleError.message}`);
+              }
+              throw error; // Re-throw the original error
+            }
+          } else {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
     }
   } catch (error) {
     if (error instanceof Error) {

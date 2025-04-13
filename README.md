@@ -38,7 +38,7 @@ This action:
 
 1. Fetches the current pull request and counts how many reviewers are already requested
 2. Calculates how many more reviewers are needed to reach the specified number
-3. Gets all members of the specified team, excluding the PR author and existing reviewers
+3. Gets all members of the specified team, excluding the PR author, existing reviewers, and the authenticated user
 4. Randomly selects the required number of reviewers from eligible team members
 5. If there aren't enough eligible team members, requests as many as possible and logs a warning
 
@@ -51,6 +51,13 @@ team member access. You can use a Personal Access Token with the following scope
 - `read:org` (required to access team membership)
 
 Store the PAT as a repository secret and pass it in your workflow.
+
+### Important Note on Authenticated Users
+
+GitHub's API doesn't allow a user to request a review from themselves. This action automatically
+filters out the authenticated user (the user associated with the provided token) from the list of
+potential reviewers. If you're using a token associated with a team member, that team member will
+never be selected as a reviewer.
 
 ## Development
 
