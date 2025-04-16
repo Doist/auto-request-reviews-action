@@ -61,15 +61,34 @@ async function run(): Promise<void> {
         )
 
         // Get team members
-        const { data: teamMembers } = await octokit.rest.teams.listMembersInOrg({
-            org: owner,
-            team_slug: team,
+        // Use GraphQL API since member availability is only available there
+        const teamMembersQuery = `
+      query getTeamMembers($owner: String!, $team: String!) {
+        organization(login: $owner) {
+          team(slug: $team) {
+            members {
+              nodes {
+                login
+                status {
+                  indicatesLimitedAvailability
+                }
+              }
+            }
+          }
+        }
+      }
+    `
+        const { organization } = await octokit.graphql(teamMembersQuery, {
+            owner,
+            team,
         })
+        const teamMembers = organization.team.members.nodes
 
-        // Filter out PR author and existing reviewers
+        // Filter out PR author, existing reviewers, and unavailable team members
         const eligibleReviewers = teamMembers
             .filter((member) => member.login !== pullRequest.user?.login)
             .filter((member) => !reviewRequests.users.some((user) => user.login === member.login))
+            .filter((member) => !member.status?.indicatesLimitedAvailability)
 
         if (eligibleReviewers.length === 0) {
             core.warning('No eligible team members found to request reviews from.')
