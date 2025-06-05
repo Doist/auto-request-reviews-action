@@ -4,6 +4,16 @@ import type { GitHub } from '@actions/github/lib/utils'
 
 type Octokit = InstanceType<typeof GitHub>
 
+// Fisher-Yates shuffle: provides uniform distribution, unlike Array.sort(() => Math.random() - 0.5)
+function shuffle<T>(array: T[]): T[] {
+    const result = [...array]
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[result[i], result[j]] = [result[j], result[i]]
+    }
+    return result
+}
+
 async function run(): Promise<void> {
     try {
         // Get inputs
@@ -96,7 +106,7 @@ async function run(): Promise<void> {
         }
 
         // Shuffle array to randomize reviewer selection
-        const shuffledReviewers = [...eligibleReviewers].sort(() => Math.random() - 0.5)
+        const shuffledReviewers = shuffle(eligibleReviewers)
 
         // Determine the actual number of reviewers we can request
         const actualReviewers = Math.min(neededReviewers, shuffledReviewers.length)
