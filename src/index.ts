@@ -53,23 +53,6 @@ async function run(): Promise<void> {
             pull_number: pullNumber,
         })
 
-        // Count existing requested reviewers
-        const existingReviewers = reviewRequests.users.length
-
-        // Calculate how many more reviewers are needed
-        const neededReviewers = Math.max(0, desiredReviewers - existingReviewers)
-
-        if (neededReviewers === 0) {
-            core.info(
-                `PR already has ${existingReviewers} reviewer(s) requested. No additional reviewers needed.`,
-            )
-            return
-        }
-
-        core.info(
-            `PR has ${existingReviewers} reviewer(s) requested. Need to request ${neededReviewers} more.`,
-        )
-
         // Get team members
         // Use GraphQL API since member availability is only available there
         const teamMembersQuery = `
@@ -93,6 +76,28 @@ async function run(): Promise<void> {
             team,
         })
         const teamMembers = organization.team.members.nodes
+
+        // Create a Set of team member logins for efficient lookup
+        const teamMemberLogins = new Set(teamMembers.map((member) => member.login))
+
+        // Count existing requested reviewers that are part of the team
+        const existingTeamReviewers = reviewRequests.users.filter((user) =>
+            teamMemberLogins.has(user.login),
+        ).length
+
+        // Calculate how many more reviewers are needed
+        const neededReviewers = Math.max(0, desiredReviewers - existingTeamReviewers)
+
+        if (neededReviewers === 0) {
+            core.info(
+                `PR already has ${existingTeamReviewers} team member reviewer(s) requested. No additional reviewers needed.`,
+            )
+            return
+        }
+
+        core.info(
+            `PR has ${existingTeamReviewers} team member reviewer(s) requested. Need to request ${neededReviewers} more.`,
+        )
 
         // Filter out PR author, existing reviewers, and unavailable team members
         const eligibleReviewers = teamMembers

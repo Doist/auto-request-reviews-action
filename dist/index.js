@@ -23906,17 +23906,6 @@ async function run() {
       repo: repo.repo,
       pull_number: pullNumber
     });
-    const existingReviewers = reviewRequests.users.length;
-    const neededReviewers = Math.max(0, desiredReviewers - existingReviewers);
-    if (neededReviewers === 0) {
-      core.info(
-        `PR already has ${existingReviewers} reviewer(s) requested. No additional reviewers needed.`
-      );
-      return;
-    }
-    core.info(
-      `PR has ${existingReviewers} reviewer(s) requested. Need to request ${neededReviewers} more.`
-    );
     const teamMembersQuery = `
       query getTeamMembers($owner: String!, $team: String!) {
         organization(login: $owner) {
@@ -23938,6 +23927,20 @@ async function run() {
       team
     });
     const teamMembers = organization.team.members.nodes;
+    const teamMemberLogins = new Set(teamMembers.map((member) => member.login));
+    const existingTeamReviewers = reviewRequests.users.filter(
+      (user) => teamMemberLogins.has(user.login)
+    ).length;
+    const neededReviewers = Math.max(0, desiredReviewers - existingTeamReviewers);
+    if (neededReviewers === 0) {
+      core.info(
+        `PR already has ${existingTeamReviewers} team member reviewer(s) requested. No additional reviewers needed.`
+      );
+      return;
+    }
+    core.info(
+      `PR has ${existingTeamReviewers} team member reviewer(s) requested. Need to request ${neededReviewers} more.`
+    );
     const eligibleReviewers = teamMembers.filter((member) => member.login !== pullRequest.user?.login).filter((member) => !reviewRequests.users.some((user) => user.login === member.login)).filter((member) => !member.status?.indicatesLimitedAvailability);
     if (eligibleReviewers.length === 0) {
       core.warning("No eligible team members found to request reviews from.");
